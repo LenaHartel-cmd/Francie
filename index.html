@@ -1,42 +1,138 @@
 <!doctype html>
 <html lang="de">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Francie – Französisch-Chat (A1–B1)</title>
-<style>
-body{font-family:system-ui,Arial;margin:1em auto;max-width:760px}
-h1{margin:0 0 .25rem 0}
-small{color:#555}
-.msg{margin:6px 0;padding:8px 12px;border-radius:10px;white-space:pre-wrap}
-.user{background:#e7f0ff}.bot{background:#f4f4f4}
-textarea{width:100%;padding:8px;border-radius:10px;border:1px solid #ccc}
-button{margin-top:6px;padding:8px 12px;border-radius:10px;border:1px solid #ccc;cursor:pointer}
-hr{margin:1rem 0;border:none;border-top:1px solid #ddd}
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Francie – Französisch-Chat</title>
+  <style>
+    body{
+      font-family:system-ui,Arial;
+      margin:1em auto;
+      max-width:760px;
+    }
+    h1{margin:0 0 .25rem 0}
+    small{color:#555}
+    hr{
+      margin:1rem 0;
+      border:none;
+      border-top:1px solid #ddd;
+    }
+    .msg{
+      margin:6px 0;
+      padding:8px 12px;
+      border-radius:10px;
+      white-space:pre-wrap;
+    }
+    .user{
+      background:#e7f0ff;
+    }
+    .bot{
+      background:#f4f4f4;
+    }
+    textarea{
+      width:100%;
+      padding:8px;
+      border-radius:10px;
+      border:1px solid #ccc;
+      box-sizing:border-box;
+    }
+    button{
+      margin-top:6px;
+      padding:8px 12px;
+      border-radius:10px;
+      border:1px solid #ccc;
+      cursor:pointer;
+    }
+
+    /* grünes Korrektur-Kästchen */
+    .correction-box{
+      background:#e5f8e5;
+      border-left:4px solid #33aa33;
+      padding:6px 10px;
+      margin-bottom:4px;
+      border-radius:6px;
+      font-weight:bold;
+      color:#0a7300;
+    }
+  </style>
 </head>
 <body>
-<h1>Francie</h1>
-<small>Französisch-Chat A1–B1 • Max. 10 Runden • Bitte keine persönlichen Daten eingeben.</small>
-<hr>
-<div id="chat"></div>
-<textarea id="input" rows="3" placeholder="Écris ici... (Strg/⌘ + Enter sendet)"></textarea>
-<button id="send">Envoyer</button>
+  <h1>Francie</h1>
+  <small>Französisch-Chat A1–B1 • Max. 10 Runden • Bitte keine persönlichen Daten eingeben.</small>
+  <hr>
+  <div id="chat"></div>
+  <textarea id="input" rows="3" placeholder="Écris ici... (Strg/⌘ + Enter = envoyer)"></textarea>
+  <button id="send">Envoyer</button>
 
-<script>
-const sid = (crypto && crypto.randomUUID)? crypto.randomUUID(): (Date.now()+"_"+Math.random());
-const chat=document.getElementById('chat'),input=document.getElementById('input'),btn=document.getElementById('send');
-function add(r,t){const d=document.createElement('div');d.className='msg '+r;d.textContent=t;chat.appendChild(d);chat.scrollTop=chat.scrollHeight;}
-async function send(){
-  const txt=input.value.trim(); if(!txt)return;
-  add('user',txt); input.value=''; btn.disabled=true;
-  try{
-    const r=await fetch('/turn',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({session_id:sid,user_text:txt})});
-    const d=await r.json(); add('bot',d.bot); btn.disabled=d.done; if(!d.done)input.focus();
-  }catch(e){ add('bot',"Désolé, une erreur s’est produite. Réessaie."); btn.disabled=false; }
-}
-btn.onclick=send;
-input.addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey))send();});
-</script>
+  <script>
+    // einfache, zufällige Session-ID pro Browserfenster
+    const sid = (crypto && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : (Date.now()+"_"+Math.random());
+
+    const chat  = document.getElementById('chat');
+    const input = document.getElementById('input');
+    const btn   = document.getElementById('send');
+
+    function add(role, text){
+      const div = document.createElement('div');
+      div.className = 'msg ' + (role === 'user' ? 'user' : 'bot');
+
+      if(role === 'assistant'){
+        const lines = String(text).trim().split('\n');
+        // erste Zeile als Korrektur-Kästchen
+        if(lines.length > 0 && lines[0].trim() !== ''){
+          const corr = document.createElement('div');
+          corr.className = 'correction-box';
+          corr.textContent = lines[0];
+          div.appendChild(corr);
+        }
+        // restliche Zeilen als normale Antwort
+        for(let i=1; i<lines.length; i++){
+          if(!lines[i].trim()) continue;
+          const p = document.createElement('div');
+          p.textContent = lines[i];
+          div.appendChild(p);
+        }
+      } else {
+        // Schüler-Text
+        div.textContent = text;
+      }
+
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    async function send(){
+      const txt = input.value.trim();
+      if(!txt) return;
+      add('user', txt);
+      input.value = '';
+      btn.disabled = true;
+
+      try{
+        const r = await fetch('/turn', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({session_id: sid, user_text: txt})
+        });
+        const d = await r.json();
+        add('assistant', d.bot);
+        btn.disabled = d.done;
+        if(!d.done) input.focus();
+      }catch(e){
+        add('assistant', "Désolé, une erreur s’est produite. Réessaie.");
+        btn.disabled = false;
+      }
+    }
+
+    btn.onclick = send;
+    input.addEventListener('keydown', e => {
+      if(e.key === 'Enter' && (e.ctrlKey || e.metaKey)){
+        e.preventDefault();
+        send();
+      }
+    });
+  </script>
 </body>
 </html>
